@@ -1,7 +1,7 @@
 import requests
 import time
 
-BOT_TOKEN = ''
+BOT_TOKEN = '1917206133:eS44bI1l1x11BZtwxb1IKmHM27YJ2LZ6d4a9I7cw'
 API_URL = f'https://tapi.bale.ai/bot{BOT_TOKEN}'
 OPENROUTER_API_KEY = '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'
 
