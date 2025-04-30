@@ -1,1 +1,6 @@
 requests
+torch
+transformers
+diffusers
+accelerate
+safetensors
