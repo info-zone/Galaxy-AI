@@ -6,7 +6,7 @@ from PIL import Image
 # === CONFIG ===
 BOT_TOKEN = "1917206133:eS44bI1l1x11BZtwxb1IKmHM27YJ2LZ6d4a9I7cw"
 URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}/"
-HF_TOKEN = "hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+HF_TOKEN = "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"
 HF_API_URL = "https://router.huggingface.co/hf-inference/models/stabilityai/stable-diffusion-xl-base-1.0"
 
 # === CHECK PERSIAN ===
