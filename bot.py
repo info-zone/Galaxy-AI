@@ -4,7 +4,7 @@ import io
 from PIL import Image
 
 # === CONFIG ===
-BOT_TOKEN = "1917206133:eS44bI1l1x11BZtwxb1IKmHM27YJ2LZ6d4a9I7cw"
+BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
 HF_TOKEN = "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"
 HF_API_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
 URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}/"
