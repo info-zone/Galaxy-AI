@@ -1,133 +1,79 @@
 import requests
 import time
-import base64
 
-# Telegram Bot Token
-BOT_TOKEN = "1917206133:eS44bI1l1x11BZtwxb1IKmHM27YJ2LZ6d4a9I7cw"
-BASE_URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}"
+BOT_TOKEN = '1917206133:eS44bI1l1x11BZtwxb1IKmHM27YJ2LZ6d4a9I7cw'
+API_URL = f'https://tapi.bale.ai/bot{BOT_TOKEN}'
+OPENROUTER_API_KEY = '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'
 
-# OpenRouter API
-OPENROUTER_API_KEY = "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"
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+SYSTEM_PROMPT = {
+    "role": "system",
+    "content": "You are Zone AI, a smart and helpful Persian-English assistant that responds clearly and politely. Always understand context from text and images. If an image is sent, describe it in detail. If the user speaks Persian, reply in Persian. Be short, useful, and friendly."
+}
 
-# System prompt
-SYSTEM_PROMPT = "You are Zone AI, a smart, friendly, highly detailed assistant. Always stay friendly, helpful, and very intelligent. If you receive an image, describe it thoughtfully and helpfully."
+def get_updates(offset=None):
+    params = {'timeout': 10, 'offset': offset}
+    return requests.get(f'{API_URL}/getUpdates', params=params).json()
 
-# Last update ID
-last_update_id = None
+def send_message(chat_id, text):
+    requests.post(f'{API_URL}/sendMessage', json={'chat_id': chat_id, 'text': text})
 
-def get_updates():
-    global last_update_id
-    params = {
-        "timeout": 100,
-        "offset": last_update_id + 1 if last_update_id else None,
-    }
-    response = requests.get(f"{BASE_URL}/getUpdates", params=params, timeout=120)
-    return response.json()["result"]
+def send_chat_action(chat_id, action='typing'):
+    requests.post(f'{API_URL}/sendChatAction', data={'chat_id': chat_id, 'action': action})
 
-def send_message(chat_id, text, reply_to=None):
-    data = {
-        "chat_id": chat_id,
-        "text": text,
-        "reply_to_message_id": reply_to,
-    }
-    requests.post(f"{BASE_URL}/sendMessage", data=data)
+def get_file_url(file_id):
+    file_path = requests.get(f'{API_URL}/getFile', params={'file_id': file_id}).json()['result']['file_path']
+    return f'https://tapi.bale.ai/file/bot{BOT_TOKEN}/{file_path}'
 
-def send_chat_action(chat_id, action="typing"):
-    requests.post(f"{BASE_URL}/sendChatAction", data={"chat_id": chat_id, "action": action})
-
-def download_file(file_id):
-    file_info = requests.get(f"{BASE_URL}/getFile", params={"file_id": file_id}).json()
-    file_path = file_info["result"]["file_path"]
-    file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path}"
-    file_content = requests.get(file_url).content
-    return file_content
-
-def ask_openrouter_text(user_text):
+def ask_openrouter(messages):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
+        "HTTP-Referer": "your-site.com",
+        "X-Title": "Zone AI",
     }
     body = {
-        "model": "deepseek/deepseek-r1:free",
-        "extra_body": {},
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_text},
-        ]
+        "model": "opengvlab/internvl3-14b:free",
+        "messages": [SYSTEM_PROMPT] + messages,
     }
-    response = requests.post(f"{OPENROUTER_BASE_URL}/chat/completions", headers=headers, json=body, timeout=60)
-    return response.json()["choices"][0]["message"]["content"]
-
-def ask_openrouter_image(image_base64):
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    body = {
-        "model": "deepseek/deepseek-r1:free",
-        "extra_body": {},
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Analyze this image and describe it thoughtfully."},
-                    {"type": "image", "image": image_base64}
-                ]
-            }
-        ]
-    }
-    response = requests.post(f"{OPENROUTER_BASE_URL}/chat/completions", headers=headers, json=body, timeout=120)
-    return response.json()["choices"][0]["message"]["content"]
-
-def handle_message(message):
-    chat_id = message["chat"]["id"]
-    message_id = message["message_id"]
-
-    send_chat_action(chat_id)
-
-    if "photo" in message:
-        # Handling image
-        file_id = message["photo"][-1]["file_id"]
-        file_content = download_file(file_id)
-        image_base64 = base64.b64encode(file_content).decode("utf-8")
-
-        try:
-            reply = ask_openrouter_image(image_base64)
-        except Exception as e:
-            print(e)
-            reply = "Sorry, I couldn't analyze the image."
-
-        send_message(chat_id, reply, reply_to=message_id)
-
-    elif "text" in message:
-        # Handling text
-        user_text = message["text"]
-
-        try:
-            reply = ask_openrouter_text(user_text)
-        except Exception as e:
-            print(e)
-            reply = "Sorry, I couldn't understand your message."
-
-        send_message(chat_id, reply, reply_to=message_id)
-
-    else:
-        send_message(chat_id, "I currently only support text and images.", reply_to=message_id)
+    r = requests.post('https://openrouter.ai/api/v1/chat/completions', headers=headers, json=body)
+    return r.json()['choices'][0]['message']['content']
 
 def main():
-    global last_update_id
-    while True:
-        try:
-            updates = get_updates()
-            for update in updates:
-                last_update_id = update["update_id"]
-                if "message" in update:
-                    handle_message(update["message"])
-        except Exception as e:
-            print("Error:", e)
-            time.sleep(2)
+    last_update = None
+    print("Bot is running...")
 
-if __name__ == "__main__":
+    while True:
+        updates = get_updates(offset=last_update)
+        for update in updates.get('result', []):
+            last_update = update['update_id'] + 1
+            message = update.get('message')
+            if not message:
+                continue
+
+            chat_id = message['chat']['id']
+            send_chat_action(chat_id)
+
+            user_msg = []
+            if 'photo' in message:
+                # Get the largest photo
+                photo = message['photo'][-1]
+                file_url = get_file_url(photo['file_id'])
+                user_msg.append({"type": "image_url", "image_url": {"url": file_url}})
+                if 'caption' in message:
+                    user_msg.insert(0, {"type": "text", "text": message['caption']})
+            elif 'text' in message:
+                user_msg.append({"type": "text", "text": message['text']})
+            else:
+                send_message(chat_id, "Only text and images are supported.")
+                continue
+
+            try:
+                reply = ask_openrouter([{"role": "user", "content": user_msg}])
+                send_message(chat_id, reply)
+            except Exception as e:
+                send_message(chat_id, f"Error: {e}")
+
+        time.sleep(0.5)
+
+if __name__ == '__main__':
     main()
