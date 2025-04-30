@@ -1,7 +1,7 @@
 import requests
 import time
 
-BOT_TOKEN = '1917206133:eS44bI1l1x11BZtwxb1IKmHM27YJ2LZ6d4a9I7cw'
+BOT_TOKEN = ''
 API_URL = f'https://tapi.bale.ai/bot{BOT_TOKEN}'
 OPENROUTER_API_KEY = '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'
 
@@ -21,7 +21,8 @@ def send_chat_action(chat_id, action='typing'):
     requests.post(f'{API_URL}/sendChatAction', data={'chat_id': chat_id, 'action': action})
 
 def get_file_url(file_id):
-    file_path = requests.get(f'{API_URL}/getFile', params={'file_id': file_id}).json()['result']['file_path']
+    file_info = requests.get(f'{API_URL}/getFile', params={'file_id': file_id}).json()
+    file_path = file_info['result']['file_path']
     return f'https://tapi.bale.ai/file/bot{BOT_TOKEN}/{file_path}'
 
 def ask_openrouter(messages):
@@ -32,11 +33,24 @@ def ask_openrouter(messages):
         "X-Title": "Zone AI",
     }
     body = {
-        "model": "opengvlab/internvl3-14b:free",
+        "model": "meta-llama/llama-4-scout:free",
         "messages": [SYSTEM_PROMPT] + messages,
     }
-    r = requests.post('https://openrouter.ai/api/v1/chat/completions', headers=headers, json=body)
-    return r.json()['choices'][0]['message']['content']
+
+    response = requests.post(
+        'https://openrouter.ai/api/v1/chat/completions',
+        headers=headers,
+        json=body
+    )
+
+    if response.status_code != 200:
+        return f"API Error: {response.status_code} - {response.text}"
+
+    data = response.json()
+    if "choices" not in data:
+        return f"Unexpected response: {data}"
+
+    return data["choices"][0]["message"]["content"]
 
 def main():
     last_update = None
@@ -55,7 +69,6 @@ def main():
 
             user_msg = []
             if 'photo' in message:
-                # Get the largest photo
                 photo = message['photo'][-1]
                 file_url = get_file_url(photo['file_id'])
                 user_msg.append({"type": "image_url", "image_url": {"url": file_url}})
