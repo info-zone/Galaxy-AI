@@ -5,7 +5,7 @@ from diffusers import DiffusionPipeline
 from io import BytesIO
 
 # Telegram Bot Token
-TOKEN = ""
+TOKEN = "1917206133:eS44bI1l1x11BZtwxb1IKmHM27YJ2LZ6d4a9I7cw"
 URL = f"https://tapi.bale.ai/bot{TOKEN}/"
 
 # Load the Stable Diffusion pipeline
