@@ -39,7 +39,7 @@ def send_image(chat_id, image_bytes):
     files = {"photo": img}
     data = {
         "chat_id": chat_id,
-        "caption": "تصویر توسط Carbon AI تولید شده است.",
+        "caption": "تصویر توسط Carbon AI ساخته شده است.",
         "parse_mode": "HTML"
     }
     requests.post(URL + "sendPhoto", data=data, files=files)
