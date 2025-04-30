@@ -29,8 +29,6 @@ def ask_openrouter(messages):
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "your-site.com",
-        "X-Title": "Zone AI",
     }
     body = {
         "model": "meta-llama/llama-4-scout:free",
