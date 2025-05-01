@@ -2,25 +2,26 @@ import requests
 import time
 import io
 from PIL import Image
-from openai import OpenAI
+import google.generativeai as genai
 
 # === CONFIG ===
 BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
 HF_TOKEN = "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"
 HF_API_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
-OR_API_KEY = "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"
-SYSTEM_PROMPT = "شما یک دستیار فارسی زبان هستید. مودب، مفید و خلاصه جواب بده. در صورتی که سوال مربوط به تصویر بود از کاربر بخواه که از دستور /gen استفاده کند."
-SPAM_DELAY = 30  # seconds between /gen requests
+GEMINI_API_KEY = "AIzaSyDb19BEMO5RvvF07zq603efVIvdH_SXUT8"
+SPAM_DELAY = 30  # seconds
 URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}/"
+
+# === Gemini Setup ===
+genai.configure(api_key=GEMINI_API_KEY)
+gemini_model = genai.GenerativeModel("gemini-pro")
 
 # === TRACK USERS ===
 user_last_gen = {}
 
-# === CHECK PERSIAN ===
 def is_persian(text):
     return any('\u0600' <= ch <= '\u06FF' for ch in text)
 
-# === TRANSLATE PERSIAN TO ENGLISH ===
 def translate_fa_to_en(text):
     params = {
         "client": "gtx",
@@ -35,14 +36,12 @@ def translate_fa_to_en(text):
     except:
         return text
 
-# === IMAGE GENERATION ===
 def generate_image(prompt):
     headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     payload = {"inputs": prompt}
     r = requests.post(HF_API_URL, headers=headers, json=payload)
     return r.content
 
-# === SEND TO TELEGRAM ===
 def send_message(chat_id, text):
     requests.post(URL + "sendMessage", data={"chat_id": chat_id, "text": text})
 
@@ -63,23 +62,11 @@ def send_typing(chat_id):
 def send_upload(chat_id):
     requests.post(URL + "sendChatAction", data={"chat_id": chat_id, "action": "upload_photo"})
 
-# === CHATBOT (OpenRouter) ===
-def chat_reply(user_message):
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=OR_API_KEY,
-    )
+def chat_reply(message):
+    SYSTEM_PROMPT = "شما یک ربات فارسی زبان هستید، مؤدب، مفید و خلاصه پاسخ می‌دهید. اگر درخواست تصویر بود، کاربر را به دستور /gen ارجاع دهید."
+    response = gemini_model.generate_content([{"role": "user", "parts": [SYSTEM_PROMPT]}, message])
+    return response.text.strip()
 
-    completion = client.chat.completions.create(
-        model="mistralai/mistral-small-24b-instruct-2501:free",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
-        ]
-    )
-    return completion.choices[0].message.content.strip()
-
-# === HANDLE MESSAGE ===
 def handle_message(msg):
     chat_id = msg['chat']['id']
     user_id = msg['from']['id']
@@ -98,7 +85,6 @@ def handle_message(msg):
             return
 
         user_last_gen[user_id] = now
-
         prompt = text[5:]
         prompt_en = translate_fa_to_en(prompt) if is_persian(prompt) else prompt
 
@@ -106,12 +92,12 @@ def handle_message(msg):
         send_upload(chat_id)
         image_bytes = generate_image(prompt_en)
         send_image(chat_id, image_bytes)
+
     else:
         send_typing(chat_id)
         reply = chat_reply(text)
         send_message(chat_id, reply)
 
-# === TELEGRAM LOOP ===
 def get_updates(offset=None):
     params = {"timeout": 100, "offset": offset}
     return requests.get(URL + "getUpdates", params=params).json()
