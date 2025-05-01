@@ -6,7 +6,7 @@ from PIL import Image
 # === CONFIG ===
 BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
 HF_API_TOKEN = "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"
-URL = f"https://api.telegram.org/bot{BOT_TOKEN}/"
+URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}/"
 SPAM_DELAY = 30  # seconds
 
 # === HF ENDPOINTS ===
