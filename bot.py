@@ -5,15 +5,16 @@ from PIL import Image
 
 # === CONFIG ===
 BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
-HF_API_TOKEN = "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"  # Use HF token that never expires
+HF_API_TOKEN = "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"
 URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}/"
 SPAM_DELAY = 30  # seconds
 
-# === HEADERS ===
-HF_IMG_HEADERS = {"Authorization": f"Bearer {HF_API_TOKEN}"}
-HF_CHAT_HEADERS = {"Authorization": f"Bearer {HF_API_TOKEN}"}
+# === HF ENDPOINTS ===
 HF_IMAGE_API = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
-HF_CHAT_API = "https://router.huggingface.co/together/v1/chat/completions"
+HF_CHAT_API = "https://router.huggingface.co/hyperbolic/v1/chat/completions"
+
+# === HEADERS ===
+HF_HEADERS = {"Authorization": f"Bearer {HF_API_TOKEN}"}
 
 user_last_gen = {}
 
@@ -37,25 +38,36 @@ def translate_fa_to_en(text):
 
 def generate_image(prompt):
     payload = {"inputs": prompt}
-    r = requests.post(HF_IMAGE_API, headers=HF_IMG_HEADERS, json=payload)
+    r = requests.post(HF_IMAGE_API, headers=HF_HEADERS, json=payload)
     return r.content
 
 def chat_reply(text):
-    system_prompt = "شما یک ربات فارسی زبان مودب و مفید هستید. اگر کاربر درخواست تصویر داشت، به او بگویید از دستور /gen استفاده کند."
+    system_prompt = (
+        "تو یک دستیار هوش مصنوعی فارسی زبان، مودب، خلاق و کمک‌رسان هستی. "
+        "پاسخ‌هایت را با لحن دوستانه، شکلک‌دار و جذاب بنویس. "
+        "مالک تو فردی به نام 'زون آر سی‌ام' یا zonercm است. "
+        "اگر کسی خواست عکس بسازی، بهش بگو دستور /gen رو استفاده کنه."
+    )
+
     payload = {
-        "model": "Qwen/Qwen3-235B-A22B-fp8-tput",
+        "model": "meta-llama/Llama-3.3-70B-Instruct",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text}
         ],
         "max_tokens": 512
     }
-    res = requests.post(HF_CHAT_API, headers=HF_CHAT_HEADERS, json=payload)
+
+    res = requests.post(HF_CHAT_API, headers=HF_HEADERS, json=payload)
     return res.json()["choices"][0]["message"]["content"]
 
-# === TELEGRAM UTILS ===
+# === TELEGRAM ===
 def send_message(chat_id, text):
-    requests.post(URL + "sendMessage", data={"chat_id": chat_id, "text": text})
+    requests.post(URL + "sendMessage", data={
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "HTML"
+    })
 
 def send_image(chat_id, image_bytes):
     img = io.BytesIO(image_bytes)
@@ -63,7 +75,7 @@ def send_image(chat_id, image_bytes):
     files = {"photo": img}
     data = {
         "chat_id": chat_id,
-        "caption": "تصویر توسط Zone AI تولید شده است.",
+        "caption": "✨ <b>تصویر توسط Zone AI تولید شده است.</b>\n🤖 با مدیریت: <b>زون آر سی‌ام</b>",
         "parse_mode": "HTML"
     }
     requests.post(URL + "sendPhoto", data=data, files=files)
@@ -74,7 +86,7 @@ def send_typing(chat_id):
 def send_upload(chat_id):
     requests.post(URL + "sendChatAction", data={"chat_id": chat_id, "action": "upload_photo"})
 
-# === CORE ===
+# === HANDLER ===
 def handle_message(msg):
     chat_id = msg['chat']['id']
     user_id = msg['from']['id']
@@ -89,7 +101,7 @@ def handle_message(msg):
 
         if now - last < SPAM_DELAY:
             wait = int(SPAM_DELAY - (now - last))
-            send_message(chat_id, f"لطفاً {wait} ثانیه دیگر صبر کنید.")
+            send_message(chat_id, f"⏳ لطفاً {wait} ثانیه دیگر صبر کن عزیز!")
             return
 
         user_last_gen[user_id] = now
@@ -97,7 +109,7 @@ def handle_message(msg):
         if is_persian(prompt):
             prompt = translate_fa_to_en(prompt)
 
-        send_message(chat_id, "در حال تولید تصویر، لطفاً منتظر بمانید...")
+        send_message(chat_id, "در حال تولید تصویر... لطفاً شکیبا باش! 🎨")
         send_upload(chat_id)
         image_bytes = generate_image(prompt)
         send_image(chat_id, image_bytes)
@@ -105,8 +117,9 @@ def handle_message(msg):
     else:
         send_typing(chat_id)
         reply = chat_reply(text)
-        send_message(chat_id, reply)
+        send_message(chat_id, f"🧠 <b>پاسخ من:</b>\n{reply}")
 
+# === MAIN LOOP ===
 def get_updates(offset=None):
     params = {"timeout": 100, "offset": offset}
     return requests.get(URL + "getUpdates", params=params).json()
