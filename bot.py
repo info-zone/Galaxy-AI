@@ -27,8 +27,45 @@ URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}/"
 # === Gemini Setup ===
 try:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel("gemini-pro")
-    logger.info("Gemini API configured successfully")
+    # Set safety settings to be less restrictive
+    safety_settings = [
+        {
+            "category": "HARM_CATEGORY_HARASSMENT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+            "category": "HARM_CATEGORY_HATE_SPEECH",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        }
+    ]
+    
+    generation_config = {
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_output_tokens": 1024,
+    }
+    
+    gemini_model = genai.GenerativeModel(
+        model_name="gemini-pro",
+        generation_config=generation_config,
+        safety_settings=safety_settings
+    )
+    
+    # Test the API with a simple query
+    test_response = gemini_model.generate_content("Hello")
+    if hasattr(test_response, 'text') or hasattr(test_response, 'parts'):
+        logger.info("Gemini API configured and tested successfully")
+    else:
+        logger.warning("Gemini API configured but response format unexpected")
 except Exception as e:
     logger.error(f"Failed to configure Gemini API: {e}")
     exit(1)
@@ -134,13 +171,21 @@ def chat_reply(text):
     try:
         SYSTEM_PROMPT = "شما یک ربات فارسی زبان هستید، مؤدب، مفید و خلاصه پاسخ می‌دهید. اگر درخواست تصویر بود، کاربر را به دستور /gen ارجاع دهید."
         
-        message = [
-            {"role": "system", "parts": [SYSTEM_PROMPT]},
-            {"role": "user", "parts": [text]}
-        ]
+        # Gemini API doesn't support system prompts directly in this format
+        # We need to combine the system prompt with the user's message
+        combined_prompt = f"{SYSTEM_PROMPT}\n\nUser message: {text}"
         
-        response = gemini_model.generate_content(message)
-        return response.text.strip()
+        response = gemini_model.generate_content(combined_prompt)
+        
+        # Make sure we have text to return
+        if hasattr(response, 'text'):
+            return response.text.strip()
+        elif hasattr(response, 'parts'):
+            # Some versions of the API may return parts
+            return ''.join([part.text for part in response.parts]).strip()
+        else:
+            logger.warning("Unexpected response format from Gemini API")
+            return "پاسخی دریافت شد اما در فرمت نامناسب. لطفا دوباره امتحان کنید."
     except Exception as e:
         logger.error(f"Chat generation error: {e}")
         return "متأسفانه در پاسخگویی خطایی رخ داد. لطفا دوباره امتحان کنید."
@@ -195,15 +240,53 @@ def handle_message(msg):
             send_image(chat_id, image_bytes)
 
         else:
+            # Text chat handling - show typing indicator
             send_typing(chat_id)
-            reply = chat_reply(text)
-            send_message(chat_id, reply)
+            
+            # Log that we're about to generate a response
+            logger.info(f"Generating chat response for user {user_id}")
+            
+            try:
+                # First attempt with the standard method
+                reply = chat_reply(text)
+                
+                # If reply is empty or very short, it might be a failure
+                if not reply or len(reply) < 5:
+                    logger.warning(f"Got suspiciously short reply: '{reply}', trying direct API call")
+                    
+                    # Fallback method - direct prompt without system message
+                    response = gemini_model.generate_content(text)
+                    if hasattr(response, 'text'):
+                        reply = response.text.strip()
+                    elif hasattr(response, 'parts'):
+                        reply = ''.join([part.text for part in response.parts]).strip()
+                
+                # Ensure we have a reply to send
+                if not reply or len(reply) < 5:
+                    reply = "متأسفانه در تولید پاسخ مشکلی پیش آمد. لطفاً سوال خود را به شکل دیگری بپرسید."
+                    
+            except Exception as e:
+                logger.error(f"Error in chat_reply: {e}")
+                reply = "متأسفانه در پاسخگویی خطایی رخ داد. لطفا دوباره امتحان کنید."
+            
+            # Log the response length
+            logger.info(f"Sending response of length {len(reply)} to user {user_id}")
+            
+            # Send the response to the user
+            result = send_message(chat_id, reply)
+            
+            # Check if the message was sent successfully
+            if not result or not result.get("ok"):
+                logger.error(f"Failed to send message: {result}")
+                # Try to send a simpler message as fallback
+                send_message(chat_id, "متأسفانه در ارسال پاسخ مشکلی پیش آمد. لطفاً دوباره تلاش کنید.")
     
     except Exception as e:
         logger.error(f"Error handling message: {e}")
         try:
             send_message(chat_id, "متأسفانه خطایی رخ داد. لطفا دوباره امتحان کنید.")
-        except:
+        except Exception as send_error:
+            logger.error(f"Failed to send error message: {send_error}")
             pass
 
 def get_updates(offset=None):
