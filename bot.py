@@ -5,10 +5,10 @@ from PIL import Image
 from openai import OpenAI
 
 # === CONFIG ===
-BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-HF_TOKEN = "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"
+BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
+HF_TOKEN = "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"
 HF_API_URL = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
-OR_API_KEY = "your-openrouter-key"
+OR_API_KEY = "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"
 SYSTEM_PROMPT = "شما یک دستیار فارسی زبان هستید. مودب، مفید و خلاصه جواب بده. در صورتی که سوال مربوط به تصویر بود از کاربر بخواه که از دستور /gen استفاده کند."
 SPAM_DELAY = 30  # seconds between /gen requests
 URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}/"
