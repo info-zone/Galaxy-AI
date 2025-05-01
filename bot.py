@@ -75,7 +75,7 @@ def send_image(chat_id, image_bytes):
     files = {"photo": img}
     data = {
         "chat_id": chat_id,
-        "caption": "✨ <b>تصویر توسط Zone AI تولید شده است.</b>\n🤖 با مدیریت: <b>زون آر سی‌ام</b>",
+        "caption": "✨ <b>تصویر توسط Carbon AI ساخته شده است.</b>\n🤖 با مدیریت: <b>زون آر سی‌ام</b>",
         "parse_mode": "HTML"
     }
     requests.post(URL + "sendPhoto", data=data, files=files)
