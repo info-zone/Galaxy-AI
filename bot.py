@@ -5,7 +5,7 @@ from telegram.ext import Updater, MessageHandler, Filters, CallbackContext
 from transformers import pipeline
 
 # Directly set your bot token here
-TOKEN = "7435111550:AAGggKVIoyYQI-UQmpqIyB31VEM6f2sINeY"
+TOKEN = "7151280338:AAGf5-CPmnhvmFEaRFEPuRP1PD3qY79fsOY"
 
 # Enable logging
 logging.basicConfig(
