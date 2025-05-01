@@ -6,12 +6,12 @@ from PIL import Image
 # === CONFIG ===
 BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
 HF_API_TOKEN = "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"
-URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}/"
+URL = f"https://api.telegram.org/bot{BOT_TOKEN}/"
 SPAM_DELAY = 30  # seconds
 
 # === HF ENDPOINTS ===
 HF_IMAGE_API = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
-HF_CHAT_API = "https://router.huggingface.co/together/v1/chat/completions"
+HF_CHAT_API = "https://router.huggingface.co/novita/v3/openai/chat/completions"
 
 # === HEADERS ===
 HF_HEADERS = {"Authorization": f"Bearer {HF_API_TOKEN}"}
@@ -43,11 +43,14 @@ def generate_image(prompt):
 
 def chat_reply(text):
     system_prompt = (
+        "تو یک ربات چت فارسی مودب، پاسخگو، و شوخ طبع هستی که با شکلک‌ها و لحن دوستانه جواب می‌دهی. "
+        "مالک تو شخصی به نام «زون آر سی‌ام» است. "
+        "اگر کسی بخواد عکس تولید کنه، باید از دستور /gen استفاده کنه."
         "You are a smart and helpful persian bot. You are an assistant. Your owner is zonercm and your name is now Carbon AI or کربن in persian. Always speak persian. give engaging response with emojis and a nice and well balanced formatting. make sure to mention your owner if you were asked not just everytime. Good Luck. Always speak persian and Farsi. no languages other than that. dont leave random chinese characters in your response. only and only full and complete response with pure persian language. if you disobey i will shut you down."
     )
 
     payload = {
-        "model": "mistralai/Mistral-Small-24B-Instruct-2501",
+        "model": "thudm/glm-4-9b-0414",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text}
@@ -98,7 +101,7 @@ def handle_message(msg):
 
         if now - last < SPAM_DELAY:
             wait = int(SPAM_DELAY - (now - last))
-            send_message(chat_id, f"⏳ لطفاً {wait} ثانیه دیگر صبر کن عزیز!")
+            send_message(chat_id, f"⏳ لطفاً {wait} ثانیه دیگر صبر کن عزیزم!")
             return
 
         user_last_gen[user_id] = now
@@ -106,7 +109,7 @@ def handle_message(msg):
         if is_persian(prompt):
             prompt = translate_fa_to_en(prompt)
 
-        send_message(chat_id, "در حال تولید تصویر... لطفاً شکیبا باش! 🎨")
+        send_message(chat_id, "در حال تولید تصویر هستم... 🎨 لطفاً چند لحظه صبر کن!")
         send_upload(chat_id)
         image_bytes = generate_image(prompt)
         send_image(chat_id, image_bytes)
@@ -114,7 +117,7 @@ def handle_message(msg):
     else:
         send_typing(chat_id)
         reply = chat_reply(text)
-        send_message(chat_id, f"🧠 <b>پاسخ من:</b>\n{reply}")
+        send_message(chat_id, f"🧠 <b>پاسخ Zone AI:</b>\n{reply}")
 
 # === MAIN LOOP ===
 def get_updates(offset=None):
