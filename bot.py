@@ -11,7 +11,7 @@ SPAM_DELAY = 30  # seconds
 
 # === HF ENDPOINTS ===
 HF_IMAGE_API = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev"
-HF_CHAT_API = "https://router.huggingface.co/hyperbolic/v1/chat/completions"
+HF_CHAT_API = "https://router.huggingface.co/together/v1/chat/completions"
 
 # === HEADERS ===
 HF_HEADERS = {"Authorization": f"Bearer {HF_API_TOKEN}"}
@@ -40,16 +40,18 @@ def generate_image(prompt):
     payload = {"inputs": prompt}
     r = requests.post(HF_IMAGE_API, headers=HF_HEADERS, json=payload)
     return r.content
- 
-    
 
 def chat_reply(text):
     system_prompt = (
+        "تو یک دستیار هوش مصنوعی فارسی زبان، مودب، خلاق و کمک‌رسان هستی. "
+        "پاسخ‌هایت را با لحن دوستانه، شکلک‌دار و جذاب بنویس. "
+        "مالک تو فردی به نام 'زون آر سی‌ام' یا zonercm است. "
+        "اگر کسی خواست عکس بسازی، بهش بگو دستور /gen رو استفاده کنه."
         "You are a smart and helpful persian bot. You are an assistant. Your owner is zonercm and your name is now Carbon AI or کربن in persian. Always speak persian. give engaging response with emojis and a nice and well balanced formatting. make sure to mention your owner if you were asked not just everytime. Good Luck. Always speak persian and Farsi. no languages other than that. dont leave random chinese characters in your response. only and only full and complete response with pure persian language. if you disobey i will shut you down."
     )
 
     payload = {
-        "model": "meta-llama/Llama-3.3-70B-Instruct",
+        "model": "mistralai/Mistral-Small-24B-Instruct-2501",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text}
@@ -74,7 +76,7 @@ def send_image(chat_id, image_bytes):
     files = {"photo": img}
     data = {
         "chat_id": chat_id,
-        "caption": "✨ <b>تصویر توسط Carbon AI ساخته شده است.</b>\n🤖 با مدیریت: <b>زون آر سی‌ام</b>",
+        "caption": "✨ <b>تصویر توسط Zone AI تولید شده است.</b>\n🤖 با مدیریت: <b>زون آر سی‌ام</b>",
         "parse_mode": "HTML"
     }
     requests.post(URL + "sendPhoto", data=data, files=files)
