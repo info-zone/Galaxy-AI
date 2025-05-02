@@ -10,10 +10,10 @@ from pymongo import MongoClient
 # Bot Configuration
 BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
 BASE_URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}"
-ADMIN_USERNAMES = ["zonercm", "admin2", "admin3"]  # Add admin usernames here
-#g
+ADMIN_USERNAMES = ["zonercm"]  # Add admin usernames here
+
 # MongoDB Configuration
-mongo_client = MongoClient('mongodb://mongo:iOaGntNtUjrGOVEEfkVxVZArKMTLpfiT@tramway.proxy.rlwy.net:56584')
+mongo_client = MongoClient('mongodb://mongo:iOaGntNtUjrGOVEEfkVxVZArKMTLpfiT@tramway.proxy.rlwy.net:56584)
 db = mongo_client['carbon_ai_bot']
 users_collection = db['users']
 codes_collection = db['codes']
@@ -194,7 +194,14 @@ def generate_admin_keyboard(user_id):
     # Check if user is admin
     is_admin = username in ADMIN_USERNAMES
     
-    keyboard = main_keyboard.copy()
+    keyboard = {
+        "keyboard": [
+            ["🔄 فارسی ← انگلیسی", "🔄 انگلیسی ← فارسی"],
+            ["💰 سکه های روزانه", "🎁 کد هدیه"],
+            ["👤 اطلاعات حساب"]
+        ],
+        "resize_keyboard": True
+    }
     
     if is_admin:
         keyboard["keyboard"].append(["👑 پنل مدیریت"])
@@ -339,68 +346,109 @@ def process_message(message):
         return
     
     # Admin Panel
-    elif text == "👑 پنل مدیریت" and is_admin:
-        admin_message = (
-            f"👑 <b>پنل مدیریت</b>\n\n"
-            f"خوش آمدید ادمین عزیز!\n"
-            f"لطفا یکی از گزینه‌های زیر را انتخاب کنید:"
-        )
-        send_message(chat_id, admin_message, admin_panel_keyboard())
+    elif text == "👑 پنل مدیریت":
+        if is_admin:
+            admin_message = (
+                f"👑 <b>پنل مدیریت</b>\n\n"
+                f"خوش آمدید ادمین عزیز!\n"
+                f"لطفا یکی از گزینه‌های زیر را انتخاب کنید:"
+            )
+            send_message(chat_id, admin_message, admin_panel_keyboard())
+        else:
+            # Non-admin users trying to access admin panel
+            help_message = (
+                "❓ <b>راهنمای ربات</b>\n\n"
+                "برای استفاده از ربات، یکی از گزینه‌های موجود در منو را انتخاب کنید.\n\n"
+                "💡 تعداد سکه‌های فعلی شما: " + str(user['coins'])
+            )
+            send_message(chat_id, help_message, generate_admin_keyboard(user_id))
         return
         
-    elif text == "📢 ارسال پیام عمومی" and is_admin:
-        send_message(
-            chat_id, 
-            "📢 لطفا پیامی که می‌خواهید به تمام کاربران ارسال شود را وارد کنید:", 
-            back_keyboard
-        )
-        users_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"state": "waiting_broadcast_message"}}
-        )
+    elif text == "📢 ارسال پیام عمومی":
+        if is_admin:
+            send_message(
+                chat_id, 
+                "📢 لطفا پیامی که می‌خواهید به تمام کاربران ارسال شود را وارد کنید:", 
+                back_keyboard
+            )
+            users_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"state": "waiting_broadcast_message"}}
+            )
+        else:
+            help_message = (
+                "❓ <b>راهنمای ربات</b>\n\n"
+                "برای استفاده از ربات، یکی از گزینه‌های موجود در منو را انتخاب کنید.\n\n"
+                "💡 تعداد سکه‌های فعلی شما: " + str(user['coins'])
+            )
+            send_message(chat_id, help_message, generate_admin_keyboard(user_id))
         return
         
-    elif text == "📊 آمار کاربران" and is_admin:
-        total_users = users_collection.count_documents({})
-        active_today = users_collection.count_documents({
-            "last_interaction": {"$gte": datetime.now() - timedelta(days=1)}
-        })
-        total_coins = sum([user.get("coins", 0) for user in users_collection.find({})])
-        
-        stats_message = (
-            f"📊 <b>آمار ربات</b>\n\n"
-            f"👥 تعداد کل کاربران: {total_users}\n"
-            f"🟢 کاربران فعال امروز: {active_today}\n"
-            f"💰 مجموع سکه‌های موجود: {total_coins}\n"
-        )
-        send_message(chat_id, stats_message, admin_panel_keyboard())
+    elif text == "📊 آمار کاربران":
+        if is_admin:
+            total_users = users_collection.count_documents({})
+            active_today = users_collection.count_documents({
+                "last_interaction": {"$gte": datetime.now() - timedelta(days=1)}
+            })
+            total_coins = sum([user.get("coins", 0) for user in users_collection.find({})])
+            
+            stats_message = (
+                f"📊 <b>آمار ربات</b>\n\n"
+                f"👥 تعداد کل کاربران: {total_users}\n"
+                f"🟢 کاربران فعال امروز: {active_today}\n"
+                f"💰 مجموع سکه‌های موجود: {total_coins}\n"
+            )
+            send_message(chat_id, stats_message, admin_panel_keyboard())
+        else:
+            help_message = (
+                "❓ <b>راهنمای ربات</b>\n\n"
+                "برای استفاده از ربات، یکی از گزینه‌های موجود در منو را انتخاب کنید.\n\n"
+                "💡 تعداد سکه‌های فعلی شما: " + str(user['coins'])
+            )
+            send_message(chat_id, help_message, generate_admin_keyboard(user_id))
         return
         
-    elif text == "🎁 ساخت کد هدیه" and is_admin:
-        send_message(
-            chat_id, 
-            "🎁 لطفا تعداد کدهای هدیه مورد نظر را وارد کنید (حداکثر 10):", 
-            back_keyboard
-        )
-        users_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"state": "waiting_code_count"}}
-        )
+    elif text == "🎁 ساخت کد هدیه":
+        if is_admin:
+            send_message(
+                chat_id, 
+                "🎁 لطفا تعداد کدهای هدیه مورد نظر را وارد کنید (حداکثر 10):", 
+                back_keyboard
+            )
+            users_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"state": "waiting_code_count"}}
+            )
+        else:
+            help_message = (
+                "❓ <b>راهنمای ربات</b>\n\n"
+                "برای استفاده از ربات، یکی از گزینه‌های موجود در منو را انتخاب کنید.\n\n"
+                "💡 تعداد سکه‌های فعلی شما: " + str(user['coins'])
+            )
+            send_message(chat_id, help_message, generate_admin_keyboard(user_id))
         return
         
-    elif text == "💰 افزودن سکه" and is_admin:
-        send_message(
-            chat_id, 
-            "💰 لطفا شناسه کاربر و تعداد سکه را به صورت زیر وارد کنید:\n<code>user_id amount</code>\nمثال: <code>123456789 5</code>", 
-            back_keyboard
-        )
-        users_collection.update_one(
-            {"user_id": user_id},
-            {"$set": {"state": "waiting_add_coins"}}
-        )
+    elif text == "💰 افزودن سکه":
+        if is_admin:
+            send_message(
+                chat_id, 
+                "💰 لطفا شناسه کاربر و تعداد سکه را به صورت زیر وارد کنید:\n<code>user_id amount</code>\nمثال: <code>123456789 5</code>", 
+                back_keyboard
+            )
+            users_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"state": "waiting_add_coins"}}
+            )
+        else:
+            help_message = (
+                "❓ <b>راهنمای ربات</b>\n\n"
+                "برای استفاده از ربات، یکی از گزینه‌های موجود در منو را انتخاب کنید.\n\n"
+                "💡 تعداد سکه‌های فعلی شما: " + str(user['coins'])
+            )
+            send_message(chat_id, help_message, generate_admin_keyboard(user_id))
         return
         
-    elif text == "📸 ارسال تصویر عمومی" and is_admin:
+    elif text == "📸 ارسال تصویر عمومی":
         send_message(
             chat_id, 
             "📸 لطفا تصویر مورد نظر را همراه با توضیحات (Caption) ارسال کنید:", 
@@ -475,53 +523,79 @@ def process_message(message):
         return
     
     # Admin states
-    elif user_state == "waiting_broadcast_message" and is_admin:
-        send_message(chat_id, "📤 در حال ارسال پیام به کاربران...")
-        success_count = broadcast_message(text)
-        
-        users_collection.update_one(
-            {"user_id": user_id},
-            {"$unset": {"state": ""}}
-        )
-        
-        send_message(
-            chat_id, 
-            f"✅ پیام با موفقیت به {success_count} کاربر ارسال شد.", 
-            admin_panel_keyboard()
-        )
-        return
-        
-    elif user_state == "waiting_code_count" and is_admin:
-        try:
-            count = int(text.strip())
-            if count < 1 or count > 10:
-                raise ValueError()
-                
-            codes = generate_code(count)
-            codes_text = "\n".join([f"<code>{code}</code>" for code in codes])
-            
-            response = (
-                f"✅ {count} کد هدیه با موفقیت ایجاد شد:\n\n"
-                f"{codes_text}\n\n"
-                f"این کدها به مدت 7 روز معتبر هستند."
-            )
+    elif user_state == "waiting_broadcast_message":
+        if is_admin:
+            send_message(chat_id, "📤 در حال ارسال پیام به کاربران...")
+            success_count = broadcast_message(text)
             
             users_collection.update_one(
                 {"user_id": user_id},
                 {"$unset": {"state": ""}}
             )
             
-            send_message(chat_id, response, admin_panel_keyboard())
-            
-        except:
             send_message(
                 chat_id, 
-                "⚠️ لطفا یک عدد معتبر بین 1 تا 10 وارد کنید.", 
-                back_keyboard
+                f"✅ پیام با موفقیت به {success_count} کاربر ارسال شد.", 
+                admin_panel_keyboard()
             )
+        else:
+            users_collection.update_one(
+                {"user_id": user_id},
+                {"$unset": {"state": ""}}
+            )
+            
+            help_message = (
+                "❓ <b>راهنمای ربات</b>\n\n"
+                "برای استفاده از ربات، یکی از گزینه‌های موجود در منو را انتخاب کنید.\n\n"
+                "💡 تعداد سکه‌های فعلی شما: " + str(user['coins'])
+            )
+            send_message(chat_id, help_message, generate_admin_keyboard(user_id))
         return
         
-    elif user_state == "waiting_add_coins" and is_admin:
+    elif user_state == "waiting_code_count":
+        if is_admin:
+            try:
+                count = int(text.strip())
+                if count < 1 or count > 10:
+                    raise ValueError()
+                    
+                codes = generate_code(count)
+                codes_text = "\n".join([f"<code>{code}</code>" for code in codes])
+                
+                response = (
+                    f"✅ {count} کد هدیه با موفقیت ایجاد شد:\n\n"
+                    f"{codes_text}\n\n"
+                    f"این کدها به مدت 7 روز معتبر هستند."
+                )
+                
+                users_collection.update_one(
+                    {"user_id": user_id},
+                    {"$unset": {"state": ""}}
+                )
+                
+                send_message(chat_id, response, admin_panel_keyboard())
+                
+            except:
+                send_message(
+                    chat_id, 
+                    "⚠️ لطفا یک عدد معتبر بین 1 تا 10 وارد کنید.", 
+                    back_keyboard
+                )
+        else:
+            users_collection.update_one(
+                {"user_id": user_id},
+                {"$unset": {"state": ""}}
+            )
+            
+            help_message = (
+                "❓ <b>راهنمای ربات</b>\n\n"
+                "برای استفاده از ربات، یکی از گزینه‌های موجود در منو را انتخاب کنید.\n\n"
+                "💡 تعداد سکه‌های فعلی شما: " + str(user['coins'])
+            )
+            send_message(chat_id, help_message, generate_admin_keyboard(user_id))
+        return
+        
+    elif user_state == "waiting_add_coins":
         try:
             parts = text.strip().split()
             target_user_id = int(parts[0])
