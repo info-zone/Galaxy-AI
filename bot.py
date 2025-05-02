@@ -10,7 +10,7 @@ from pymongo import MongoClient
 # Bot Configuration
 BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
 BASE_URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}"
-ADMIN_USERNAMES = ["zonercm"]  # Add admin usernames here
+ADMIN_USERNAMES = ["zonercm", "gfshas", "beuhm"]  # Add admin usernames here
 
 # MongoDB Configuration
 mongo_client = MongoClient('mongodb://mongo:iOaGntNtUjrGOVEEfkVxVZArKMTLpfiT@tramway.proxy.rlwy.net:56584)
