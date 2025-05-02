@@ -1,7 +1,7 @@
 import requests
 import time
 import logging
-from google.genai import genai
+from google import genai
 from google.genai import types
 
 # === SETUP LOGGING ===
