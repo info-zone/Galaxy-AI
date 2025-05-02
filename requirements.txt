@@ -1,3 +1,2 @@
-transformers
-torch
-python-telegram-bot
+requests
+google-genai
