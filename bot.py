@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 # ----- Configuration -----
 TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
-BASE_URL = f"https://tapi.tapi.bale/bot{TOKEN}"
+BASE_URL = f"https://tapi.bale/bot{TOKEN}"
 MONGO_URI = "mongodb://mongo:iOaGntNtUjrGOVEEfkVxVZArKMTLpfiT@tramway.proxy.rlwy.net:56584"
 ADMINS = ["zonercm", "dszone"]  # List of admin usernames
 
