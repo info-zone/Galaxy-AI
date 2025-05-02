@@ -1,18 +1,27 @@
 import time
 import requests
 import pymongo
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # ----- Configuration -----
 TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
-BASE_URL = f"https://tapi.bale/bot{TOKEN}"
+BASE_URL = f"https://tapi.bale.ai/bot{TOKEN}"
 MONGO_URI = "mongodb://mongo:iOaGntNtUjrGOVEEfkVxVZArKMTLpfiT@tramway.proxy.rlwy.net:56584"
-ADMINS = ["zonercm", "dszone"]  # List of admin usernames
+ADMINS = ["zonercm", "admin2"]  # لیست یوزرنیم‌های ادمین‌ها
 
-# Reply keyboard layouts
-MAIN_KEYBOARD = [["فارسی ← انگلیسی", "انگلیسی ← فارسی"], ["🎁 کوین رایگان روزانه", "🎟️ کد هدیه"], ["👤 اطلاعات حساب"]]
+# ----- Keyboard Layouts -----
+MAIN_KEYBOARD = [
+    ["📥 فارسی ← انگلیسی", "📤 انگلیسی ← فارسی"],
+    ["🎁 کوین روزانه", "🎟️ کد هدیه"],
+    ["👤 اطلاعات حساب"]
+]
 BACK_KEYBOARD = [["🔙 بازگشت به منوی اصلی"]]
-ADMIN_KEYBOARD = [["📤 ارسال پیام"], ["🖼️ ارسال تصویر"], ["📸 تصویر با کپشن"], ["🔙 بازگشت (ادمین)"]]
+ADMIN_KEYBOARD = [
+    ["📣 ارسال پیام به همه"],
+    ["🖼️ ارسال تصویر"],
+    ["📸 تصویر با کپشن"],
+    ["❌ خروج ادمین"]
+]
 
 # ----- Database Setup -----
 client = pymongo.MongoClient(MONGO_URI)
@@ -20,7 +29,7 @@ db = client["botdb"]
 users_col = db["users"]
 codes_col = db["codes"]
 
-# Ensure some sample codes (expired field)
+# نمونه کدها
 if codes_col.count_documents({}) == 0:
     codes_col.insert_many([
         {"code": "WELCOME5", "value": 5, "used": False},
@@ -29,9 +38,8 @@ if codes_col.count_documents({}) == 0:
 
 # ----- Helper Functions -----
 
-def send_method(method: str, data: dict, files=None):
-    url = f"{BASE_URL}/{method}"
-    return requests.post(url, data=data, files=files)
+def send_method(method, data, files=None):
+    return requests.post(f"{BASE_URL}/{method}", data=data, files=files)
 
 
 def send_message(chat_id, text, reply_markup=None):
@@ -41,25 +49,24 @@ def send_message(chat_id, text, reply_markup=None):
     return send_method("sendMessage", payload)
 
 
-def send_photo(chat_id, photo_url, caption=None):
-    payload = {"chat_id": chat_id, "photo": photo_url}
+def send_photo(chat_id, photo, caption=None):
+    payload = {"chat_id": chat_id, "photo": photo}
     if caption:
-        payload["caption"] = caption
-        payload["parse_mode"] = "HTML"
+        payload.update({"caption": caption, "parse_mode": "HTML"})
     return send_method("sendPhoto", payload)
 
 
 def get_updates(offset=None, timeout=30):
-    params = {"timeout": timeout, "offset": offset}
-    return requests.get(f"{BASE_URL}/getUpdates", params=params).json()
+    return requests.get(f"{BASE_URL}/getUpdates", params={"offset": offset, "timeout": timeout}).json()
 
 
-def google_translate(text, target_lang):
-    resp = requests.get(
+def google_translate(text, target):
+    # JSON response: [[ ["translated",...],... ]]
+    res = requests.get(
         "https://translate.googleapis.com/translate_a/single",
-        params={"client": "gtx", "sl": "auto", "tl": target_lang, "dt": "t", "q": text}
+        params={"client": "gtx", "sl": "auto", "tl": target, "dt": "t", "q": text}
     ).json()
-    return resp[0][0][0]
+    return res[0][0][0]
 
 
 def get_user(chat_id, username, first_name):
@@ -71,148 +78,159 @@ def get_user(chat_id, username, first_name):
     return user
 
 
-def update_user(chat_id, **kwargs):
-    users_col.update_one({"chat_id": chat_id}, {"$set": kwargs})
+def update_user(chat_id, **fields):
+    users_col.update_one({"chat_id": chat_id}, {"$set": fields})
 
-# ----- Main Loop -----
+# ----- Main Polling Loop -----
 offset = None
 while True:
-    updates = get_updates(offset)
-    for item in updates.get("result", []):
-        offset = item["update_id"] + 1
-        msg = item.get("message")
+    data = get_updates(offset)
+    for upd in data.get("result", []):
+        offset = upd["update_id"] + 1
+        msg = upd.get("message")
         if not msg: continue
         chat_id = msg["chat"]["id"]
         txt = msg.get("text", "")
         user = get_user(chat_id, msg["from"].get("username", ''), msg["from"].get("first_name", ''))
         state = user.get("state")
 
-        # Deduct coin (except admin)
+        # Deduct a coin (non-admin)
         def use_coin():
-            if user["coins"] <= 0:
-                send_message(chat_id, "❌ کوین شما کافی نیست!", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
-                return False
-            update_user(chat_id, coins=user["coins"] - 1)
+            if user["username"] not in ADMINS:
+                if user["coins"] <= 0:
+                    send_message(chat_id, "⛔️ کوین‌هات تموم شده! لطفاً شارژ کن.",
+                                 reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
+                    return False
+                update_user(chat_id, coins=user["coins"] - 1)
             return True
 
-        # Handle /start
+        # /start
         if txt == "/start":
             update_user(chat_id, state=None)
             send_message(chat_id,
-                         f"👋 سلام {user['first_name']}! خوش اومدی به ربات Carbon AI 🤖\nلطفاً گزینه‌ای را انتخاب کن:",
+                         f"👋 سلام {user['first_name']}! به Carbon AI خوش اومدی 🤖✨\nیه گزینه انتخاب کن:",
                          reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
             continue
 
-        # Admin panel toggle
+        # Admin panel entry
         if txt == "/admin" and user.get("username") in ADMINS:
-            update_user(chat_id, state="admin_panel")
-            send_message(chat_id, "🔒 پنل ادمین:", reply_markup={"keyboard": ADMIN_KEYBOARD, "resize_keyboard": True})
+            update_user(chat_id, state="admin")
+            send_message(chat_id, "🔐 پنل ادمین باز شد:",
+                         reply_markup={"keyboard": ADMIN_KEYBOARD, "resize_keyboard": True})
             continue
 
-        # State: admin_panel
-        if state == "admin_panel":
-            if txt == "🔙 بازگشت (ادمین)":
+        # Admin panel actions
+        if state == "admin":
+            if txt == "❌ خروج ادمین":
                 update_user(chat_id, state=None)
-                send_message(chat_id, "🔙 بازگشت به منوی اصلی", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
-            elif txt == "📤 ارسال پیام":
-                update_user(chat_id, state="admin_send_msg")
-                send_message(chat_id, "📩 لطفاً پیام برای ارسال را تایپ کنید:")
+                send_message(chat_id, "🔙 بازگشت به منو اصلی", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
+
+            elif txt == "📣 ارسال پیام به همه":
+                update_user(chat_id, state="adm_msg")
+                send_message(chat_id, "✏️ پیام خودت رو تایپ کن:")
+
             elif txt == "🖼️ ارسال تصویر":
-                update_user(chat_id, state="admin_send_img")
-                send_message(chat_id, "🌆 لطفاً آدرس تصویر را ارسال کنید:")
+                update_user(chat_id, state="adm_img")
+                send_message(chat_id, "🔗 آدرس تصویر رو بفرست:")
+
             elif txt == "📸 تصویر با کپشن":
-                update_user(chat_id, state="admin_send_img_cap")
-                send_message(chat_id, "🌄 لطفاً آدرس تصویر و سپس کپشن را با خط جدید ارسال کنید:")
+                update_user(chat_id, state="adm_imgcap")
+                send_message(chat_id, "🔗 URL و بعدش کپشن رو بذار تو دو خط:")
+
             else:
-                # Handle admin send flows
-                if state == "admin_send_msg":
-                    for u in users_col.find():
-                        send_message(u["chat_id"], txt)
-                    send_message(chat_id, "✅ پیام شما ارسال شد.")
-                    update_user(chat_id, state="admin_panel")
-                elif state == "admin_send_img":
-                    for u in users_col.find():
-                        send_photo(u["chat_id"], txt)
-                    send_message(chat_id, "✅ تصویر ارسال شد.")
-                    update_user(chat_id, state="admin_panel")
-                elif state == "admin_send_img_cap":
+                # Broadcast flows
+                if state == "adm_msg":
+                    for u in users_col.find(): send_message(u["chat_id"], txt)
+                    send_message(chat_id, "✅ پیام ارسال شد!")
+                    update_user(chat_id, state="admin")
+
+                elif state == "adm_img":
+                    for u in users_col.find(): send_photo(u["chat_id"], txt)
+                    send_message(chat_id, "✅ تصویر ارسال شد!")
+                    update_user(chat_id, state="admin")
+
+                elif state == "adm_imgcap":
                     parts = txt.split("\n", 1)
                     if len(parts) == 2:
                         url, cap = parts
-                        for u in users_col.find():
-                            send_photo(u["chat_id"], url, cap)
-                        send_message(chat_id, "✅ تصویر با کپشن ارسال شد.")
+                        for u in users_col.find(): send_photo(u["chat_id"], url, cap)
+                        send_message(chat_id, "✅ تصویر با کپشن ارسال شد!")
+                        update_user(chat_id, state="admin")
                     else:
-                        send_message(chat_id, "⚠️ فرمت اشتباه! دوباره تلاش کنید.")
-                    update_user(chat_id, state="admin_panel")
+                        send_message(chat_id, "⚠️ فرمت درست نبود، دوباره تلاش کن.")
             continue
 
-        # Main Menu Buttons
+        # Back button
         if txt == "🔙 بازگشت به منوی اصلی":
             update_user(chat_id, state=None)
-            send_message(chat_id, "🔙 بازگشت به منوی اصلی", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
+            send_message(chat_id, "🔙 برگشت!", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
             continue
 
-        if txt in ["فارسی ← انگلیسی", "انگلیسی ← فارسی"]:
-            direction = "en" if txt.startswith("فارسی") else "fa"
+        # Translation commands
+        if txt in ["📥 فارسی ← انگلیسی", "📤 انگلیسی ← فارسی"]:
+            direction = "en" if txt.startswith("📥") else "fa"
             update_user(chat_id, state=f"trans_{direction}")
-            send_message(chat_id, "✏️ لطفاً متن را ارسال کنید:", reply_markup={"keyboard": BACK_KEYBOARD, "resize_keyboard": True})
+            send_message(chat_id, "✏️ متنت رو بفرس:", reply_markup={"keyboard": BACK_KEYBOARD, "resize_keyboard": True})
             continue
 
+        # Process translation
         if state and state.startswith("trans_"):
-            # translation flow
             if txt == "🔙 بازگشت به منوی اصلی":
                 update_user(chat_id, state=None)
-                send_message(chat_id, "🔙 بازگشت", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
+                send_message(chat_id, "🔙 برگشت", reply_markup={k: v for k,v in [("keyboard", MAIN_KEYBOARD), ("resize_keyboard", True)]})
                 continue
-            if not use_coin():
-                continue
+            if not use_coin(): continue
             _, lang = state.split("_")
             target = "en" if lang == "en" else "fa"
-            result = google_translate(txt, target)
-            send_message(chat_id, f"<b>🔤 ترجمه:</b>\n{result}\n\n<i>Translated by Carbon AI</i>",
+            translated = google_translate(txt, target)
+            send_message(chat_id,
+                         f"🔤 <b>ترجمه:</b>\n{translated}\n\n<i>Translated by Carbon AI</i>",
                          reply_markup={"keyboard": BACK_KEYBOARD, "resize_keyboard": True})
             update_user(chat_id, state=None)
             continue
 
-        if txt == "🎁 کوین رایگان روزانه":
-            # daily coin
+        # Daily coin
+        if txt == "🎁 کوین روزانه":
             last = user.get("last_daily")
             today = datetime.utcnow().date()
             if last and datetime.fromisoformat(last).date() == today:
-                send_message(chat_id, "❌ امروز کوین خود را دریافت کرده‌اید! فردا بازگردید.")
+                send_message(chat_id, "⛔️ امروز دریافت کردی! فردا بیا.")
             else:
                 update_user(chat_id, coins=user["coins"] + 1, last_daily=today.isoformat())
-                send_message(chat_id, f"✅ یک کوین دریافت شد! کوین‌های شما: {user['coins']+1}")
+                send_message(chat_id, f"🎉 یک کوین جدید! تو الان {user['coins']+1} کوین داری 😎")
             continue
 
+        # Redeem code
         if txt == "🎟️ کد هدیه":
-            update_user(chat_id, state="redeem_code")
-            send_message(chat_id, "🎫 لطفاً کد هدیه را وارد کنید:", reply_markup={"keyboard": BACK_KEYBOARD, "resize_keyboard": True})
+            update_user(chat_id, state="redeem")
+            send_message(chat_id, "🎫 کده رو وارد کن:", reply_markup={"keyboard": BACK_KEYBOARD, "resize_keyboard": True})
             continue
 
-        if state == "redeem_code":
+        if state == "redeem":
             if txt == "🔙 بازگشت به منوی اصلی":
                 update_user(chat_id, state=None)
-                send_message(chat_id, "🔙 بازگشت", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
+                send_message(chat_id, "🔙 برگشت", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
                 continue
             code = codes_col.find_one({"code": txt, "used": False})
             if code:
                 users_col.update_one({"chat_id": chat_id}, {"$inc": {"coins": code["value"]}})
                 codes_col.update_one({"_id": code["_id"]}, {"$set": {"used": True}})
-                send_message(chat_id, f"🎉 موفق! {code['value']} کوین به حساب شما اضافه شد.")
+                send_message(chat_id, f"🎉 موفق! +{code['value']} کوین دریافت شد!")
             else:
-                send_message(chat_id, "❌ کد نامعتبر یا استفاده شده است.")
+                send_message(chat_id, "❌ کد نامعتبر یا استفاده شده.")
             update_user(chat_id, state=None)
             continue
 
+        # Account info
         if txt == "👤 اطلاعات حساب":
-            send_message(chat_id,
-                         f"👤 <b>حساب شما:</b>\n
-• نام کاربری: @{user.get('username')}\n• نام: {user.get('first_name')}\n• کوین‌ها: {user.get('coins')}", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
+            msg = f"""👤 <b>حساب شما:</b>
+• نام کاربری: @{user.get('username')}
+• نام: {user.get('first_name')}
+• کوین‌ها: {user.get('coins')}"""
+            send_message(chat_id, msg, reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
             continue
 
-        # Fallback
-        send_message(chat_id, "⚠️ دستور نامعتبر. لطفاً از منوی اصلی انتخاب کنید.", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
+        # Default fallback
+        send_message(chat_id, "⚠️ دستور نامعتبر! لطفاً از منو انتخاب کن.", reply_markup={"keyboard": MAIN_KEYBOARD, "resize_keyboard": True})
 
     time.sleep(0.5)
