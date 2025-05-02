@@ -11,7 +11,7 @@ from pymongo import MongoClient
 BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
 BASE_URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}"
 ADMIN_USERNAMES = ["zonercm", "admin2", "admin3"]  # Add admin usernames here
-
+#g
 # MongoDB Configuration
 mongo_client = MongoClient('mongodb://mongo:iOaGntNtUjrGOVEEfkVxVZArKMTLpfiT@tramway.proxy.rlwy.net:56584')
 db = mongo_client['carbon_ai_bot']
