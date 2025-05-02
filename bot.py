@@ -1,66 +1,53 @@
-import logging
-import torch
-from telegram import Update, Bot
-from telegram.ext import Updater, MessageHandler, Filters, CallbackContext
-from transformers import pipeline
+import requests
+from google import genai
+from google.genai import types
 
-# Directly set your bot token here
-TOKEN = "7151280338:AAGf5-CPmnhvmFEaRFEPuRP1PD3qY79fsOY"
+# === CONFIG ===
+BOT_TOKEN = "2109246071:LvlHCpvSkjpD8rFw1N4lNcaJmKP5EyCxgUNp6euX"
+GEMINI_API_KEY = "AIzaSyDb19BEMO5RvvF07zq603efVIvdH_SXUT8"
+URL = f"https://tapi.bale.ai/bot{BOT_TOKEN}/"
 
-# Enable logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+# === INIT GEMINI ===
+client = genai.Client(api_key=GEMINI_API_KEY)
+model = "gemini-2.0-flash-lite"
+config = types.GenerateContentConfig(response_mime_type="text/plain")
 
-# Determine device for model (GPU if available, else CPU)
-device = 0 if torch.cuda.is_available() else -1
-if device == 0:
-    logger.info(f"CUDA is available. Using GPU: {torch.cuda.get_device_name(0)}")
-else:
-    logger.info("CUDA is not available. Using CPU.")
+# === GEMINI REPLY FUNCTION ===
+def ask_gemini(prompt):
+    contents = [types.Content(role="user", parts=[types.Part.from_text(prompt)])]
+    reply = ""
+    for chunk in client.models.generate_content_stream(
+        model=model, contents=contents, config=config
+    ):
+        reply += chunk.text
+    return reply.strip()
 
-# Initialize the text-generation pipeline
-pipe = pipeline(
-    "text-generation",
-    model="deepseek-ai/DeepSeek-V3-0324",
-    trust_remote_code=True,
-    device=device
-)
+# === TELEGRAM GET/REPLY ===
+def get_updates(offset=None):
+    params = {"timeout": 100, "offset": offset}
+    res = requests.get(URL + "getUpdates", params=params)
+    return res.json()
 
-# Handler for incoming messages
-def handle_message(update: Update, context: CallbackContext) -> None:
-    user_msg = update.message.text
-    logger.info(f"Received message: {user_msg}")
+def send_message(chat_id, text):
+    data = {"chat_id": chat_id, "text": text}
+    requests.post(URL + "sendMessage", data=data)
 
-    messages = [{"role": "user", "content": user_msg}]
-
-    try:
-        result = pipe(messages)
-        if isinstance(result, list) and "generated_text" in result[0]:
-            response = result[0]["generated_text"]
-        else:
-            response = str(result)
-    except Exception as e:
-        logger.error(f"Error during generation: {e}")
-        response = "Sorry, I encountered an error while thinking."
-
-    update.message.reply_text(response)
-
-
+# === MAIN LOOP ===
 def main():
-    if not TOKEN:
-        logger.error("Bot token is missing. Please set it in the script.")
-        return
+    last_update_id = None
+    while True:
+        updates = get_updates(last_update_id)
+        if "result" in updates:
+            for update in updates["result"]:
+                if "message" in update and "text" in update["message"]:
+                    chat_id = update["message"]["chat"]["id"]
+                    text = update["message"]["text"]
 
-    updater = Updater(token=TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+                    # Process user input
+                    ai_response = ask_gemini(text)
+                    send_message(chat_id, ai_response)
 
-    updater.start_polling()
-    logger.info("Bot started. Listening for messages...")
-    updater.idle()
+                    last_update_id = update["update_id"] + 1
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
