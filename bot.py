@@ -14,7 +14,7 @@ config = types.GenerateContentConfig(response_mime_type="text/plain")
 
 # === GEMINI REPLY FUNCTION ===
 def ask_gemini(prompt):
-    contents = [types.Content(role="user", parts=[types.Part.from_text(prompt)])]
+    contents = [types.Content(role="user", parts=[prompt])]
     reply = ""
     for chunk in client.models.generate_content_stream(
         model=model, contents=contents, config=config
